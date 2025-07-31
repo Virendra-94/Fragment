@@ -22,9 +22,9 @@ const Footer = () => {
               Perfect for corporate environments and collaboration.
             </p>
             <div className="flex items-center space-x-2 text-slate-400">
-              <span>Made with</span>
+              <span>Developed by </span>
               <Heart className="w-4 h-4 text-slate-400 fill-current" />
-              <span>for developers</span>
+              <span>Virendra</span>
             </div>
           </div>
 
@@ -76,7 +76,7 @@ const Footer = () => {
         {/* Bottom Bar */}
         <div className="border-t border-white/10 mt-8 pt-8 flex flex-col md:flex-row justify-between items-center">
           <div className="text-white/60 text-sm mb-4 md:mb-0">
-            © 2024 Fragment. All rights reserved.
+            © 2025 Fragment. All rights reserved.
           </div>
           
           <div className="flex items-center space-x-4">
@@ -87,7 +87,7 @@ const Footer = () => {
               className="text-white/60 hover:text-white transition-colors flex items-center space-x-1"
             >
               <Github className="w-4 h-4" />
-              <span className="text-sm">GitHub</span>
+              <span className="text-sm">GitHub/Virendra-94</span>
             </a>
           </div>
         </div>
