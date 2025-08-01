@@ -2,8 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { tomorrow } from 'react-syntax-highlighter/dist/esm/styles/prism';
-import { Copy, Check, Eye, Calendar, Clock, ArrowLeft, Share2, RefreshCw, Code, Image as ImageIcon, Plus, X } from 'lucide-react';
-import { API_BASE_URL } from '../config';
+import { Copy, Check, Eye, Calendar, Clock, ArrowLeft, Share2, RefreshCw, Code, Image as ImageIcon, Plus, X, Trash2 } from 'lucide-react';
+
 
 const SessionViewer = () => {
   const { id } = useParams();
@@ -17,13 +17,14 @@ const SessionViewer = () => {
   const [codeForm, setCodeForm] = useState({ code: '', language: 'javascript', title: '', description: '' });
   const [selectedFile, setSelectedFile] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [deletingItems, setDeletingItems] = useState(new Set());
 
   useEffect(() => {
     fetchSession();
     // Set up auto-refresh every 30 seconds
     const interval = setInterval(fetchSession, 30000);
     return () => clearInterval(interval);
-  }, [id]);
+  }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const fetchSession = async () => {
     try {
@@ -135,8 +136,66 @@ const SessionViewer = () => {
 
   const handleFileSelect = (e) => {
     const file = e.target.files[0];
-    if (file && file.type.startsWith('image/')) {
-      setSelectedFile(file);
+    setSelectedFile(file);
+  };
+
+  const handleDeleteSnippet = async (snippetId) => {
+    if (!window.confirm('Are you sure you want to remove this code snippet from the session?')) {
+      return;
+    }
+
+    setDeletingItems(prev => new Set([...prev, `snippet-${snippetId}`]));
+    try {
+      const response = await fetch(`/api/sessions/${id}/snippets/${snippetId}`, {
+        method: 'DELETE',
+      });
+
+      const data = await response.json();
+      
+      if (data.success) {
+        fetchSession(); // Refresh session data
+      } else {
+        alert('Failed to remove snippet from session');
+      }
+    } catch (error) {
+      console.error('Error:', error);
+      alert('Failed to remove snippet from session');
+    } finally {
+      setDeletingItems(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(`snippet-${snippetId}`);
+        return newSet;
+      });
+    }
+  };
+
+  const handleDeleteImage = async (imageId) => {
+    if (!window.confirm('Are you sure you want to remove this image from the session?')) {
+      return;
+    }
+
+    setDeletingItems(prev => new Set([...prev, `image-${imageId}`]));
+    try {
+      const response = await fetch(`/api/sessions/${id}/images/${imageId}`, {
+        method: 'DELETE',
+      });
+
+      const data = await response.json();
+      
+      if (data.success) {
+        fetchSession(); // Refresh session data
+      } else {
+        alert('Failed to remove image from session');
+      }
+    } catch (error) {
+      console.error('Error:', error);
+      alert('Failed to remove image from session');
+    } finally {
+      setDeletingItems(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(`image-${imageId}`);
+        return newSet;
+      });
     }
   };
 
@@ -153,35 +212,26 @@ const SessionViewer = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="spinner mx-auto mb-4"></div>
-          <p className="text-white/80">Loading session...</p>
-        </div>
+      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-blue-900 to-purple-900 flex items-center justify-center">
+        <div className="text-white text-xl">Loading session...</div>
       </div>
     );
   }
 
-  if (error) {
+  if (error || !session) {
     return (
-      <div className="min-h-screen flex items-center justify-center px-4">
-        <div className="text-center max-w-md">
-          <div className="text-6xl mb-4">😕</div>
-          <h1 className="text-2xl font-bold text-white mb-4">Session Not Found</h1>
-          <p className="text-white/70 mb-6">
-            The sharing session you're looking for doesn't exist or has been removed.
-          </p>
-          <Link
-            to="/"
-            className="btn-primary inline-flex items-center space-x-2"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            <span>Go Home</span>
-          </Link>
-        </div>
+      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-blue-900 to-purple-900 flex items-center justify-center">
+        <div className="text-red-400 text-xl">Error: {error || 'Session not found'}</div>
       </div>
     );
   }
+
+  // Create safe session object to prevent undefined errors
+  const safeSession = {
+    ...session,
+    snippets: session.snippets || [],
+    images: session.images || []
+  };
 
   return (
     <div className="min-h-screen py-8 px-4">
@@ -203,11 +253,27 @@ const SessionViewer = () => {
                   Live Sharing Session
                 </h1>
                 <p className="text-white/70 text-lg">
-                  Session ID: {session.id}
+                  Session ID: {safeSession.id}
                 </p>
               </div>
               
-              <div className="flex space-x-2 mt-4 md:mt-0">
+              <div className="flex flex-wrap gap-2 mt-4 md:mt-0">
+                <button
+                  onClick={() => setShowCodeForm(true)}
+                  className="btn-primary flex items-center space-x-2"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Add Code</span>
+                </button>
+                
+                <button
+                  onClick={() => setShowImageForm(true)}
+                  className="btn-secondary flex items-center space-x-2"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Add Images</span>
+                </button>
+                
                 <button
                   onClick={fetchSession}
                   className="btn-secondary flex items-center space-x-2"
@@ -230,19 +296,19 @@ const SessionViewer = () => {
             <div className="flex flex-wrap items-center gap-4 text-sm text-white/60">
               <div className="flex items-center space-x-1">
                 <Calendar className="w-4 h-4" />
-                <span>Created {formatDate(session.createdAt)}</span>
+                <span>Created {formatDate(safeSession.createdAt)}</span>
               </div>
               <div className="flex items-center space-x-1">
                 <Clock className="w-4 h-4" />
-                <span>Last updated {formatDate(session.lastUpdated)}</span>
+                <span>Last updated {formatDate(safeSession.lastUpdated)}</span>
               </div>
               <div className="flex items-center space-x-1">
                 <Code className="w-4 h-4" />
-                <span>{session.snippets.length} code snippet{session.snippets.length !== 1 ? 's' : ''}</span>
+                <span>{safeSession.snippets.length} code snippet{safeSession.snippets.length !== 1 ? 's' : ''}</span>
               </div>
               <div className="flex items-center space-x-1">
                 <ImageIcon className="w-4 h-4" />
-                <span>{session.images.length} image{session.images.length !== 1 ? 's' : ''}</span>
+                <span>{safeSession.images.length} image{safeSession.images.length !== 1 ? 's' : ''}</span>
               </div>
               {lastUpdated && (
                 <div className="flex items-center space-x-1 text-green-400">
@@ -256,15 +322,24 @@ const SessionViewer = () => {
         {/* Content */}
         <div className="space-y-8">
           {/* Code Snippets */}
-          {session.snippets.length > 0 && (
+          {safeSession.snippets.length > 0 && (
             <div>
-              <h2 className="text-2xl font-bold text-white mb-6 flex items-center space-x-2">
-                <Code className="w-6 h-6" />
-                <span>Code Snippets</span>
-              </h2>
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-bold text-white flex items-center space-x-2">
+                  <Code className="w-6 h-6" />
+                  <span>Code Snippets</span>
+                </h2>
+                <button
+                  onClick={() => setShowCodeForm(true)}
+                  className="btn-primary flex items-center space-x-2"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Add More Code</span>
+                </button>
+              </div>
               
               <div className="space-y-6">
-                {session.snippets.map((snippet, index) => (
+                {safeSession.snippets.map((snippet, index) => (
                   <div key={snippet.id} className="card-dark p-6">
                     <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-4">
                       <div>
@@ -292,12 +367,26 @@ const SessionViewer = () => {
                         </button>
                         
                         <Link
-                          to={`/share/${snippet.id}`}
+                          to={`/share/${snippet.id}?returnTo=${encodeURIComponent(`/session/${id}`)}&returnLabel=${encodeURIComponent('Back to Session')}`}
                           className="btn-primary flex items-center space-x-2"
                         >
                           <Eye className="w-4 h-4" />
                           <span>View Full</span>
                         </Link>
+                        
+                        <button
+                          onClick={() => handleDeleteSnippet(snippet.id)}
+                          disabled={deletingItems.has(`snippet-${snippet.id}`)}
+                          className="btn-danger flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                          title="Remove from session"
+                        >
+                          {deletingItems.has(`snippet-${snippet.id}`) ? (
+                            <div className="spinner w-4 h-4"></div>
+                          ) : (
+                            <Trash2 className="w-4 h-4" />
+                          )}
+                          <span className="hidden sm:inline">{deletingItems.has(`snippet-${snippet.id}`) ? 'Removing...' : 'Remove'}</span>
+                        </button>
                       </div>
                     </div>
 
@@ -346,15 +435,24 @@ const SessionViewer = () => {
           )}
 
           {/* Images */}
-          {session.images.length > 0 && (
+          {safeSession.images.length > 0 && (
             <div>
-              <h2 className="text-2xl font-bold text-white mb-6 flex items-center space-x-2">
-                <ImageIcon className="w-6 h-6" />
-                <span>Images</span>
-              </h2>
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-bold text-white flex items-center space-x-2">
+                  <ImageIcon className="w-6 h-6" />
+                  <span>Images</span>
+                </h2>
+                <button
+                  onClick={() => setShowImageForm(true)}
+                  className="btn-secondary flex items-center space-x-2"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Add More Images</span>
+                </button>
+              </div>
               
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {session.images.map((image) => (
+                {safeSession.images.map((image) => (
                   <div key={image.id} className="card-dark p-4">
                     <div className="text-center mb-4">
                       <img
@@ -372,22 +470,38 @@ const SessionViewer = () => {
                         {(image.size / 1024 / 1024).toFixed(2)} MB
                       </p>
                       
-                      <div className="flex space-x-2">
-                        <a
-                          href={`/api/images/${image.id}/download`}
-                          download
-                          className="btn-secondary flex-1 flex items-center justify-center space-x-2 text-sm"
-                        >
-                          <span>Download</span>
-                        </a>
+                      <div className="flex flex-col space-y-2">
+                        <div className="flex space-x-2">
+                          <a
+                            href={`/api/images/${image.id}/download`}
+                            download
+                            className="btn-secondary flex-1 flex items-center justify-center space-x-2 text-sm"
+                          >
+                            <span>Download</span>
+                          </a>
+                          
+                          <Link
+                            to={`/image/${image.id}`}
+                            className="btn-primary flex-1 flex items-center justify-center space-x-2 text-sm"
+                          >
+                            <Eye className="w-4 h-4" />
+                            <span>View</span>
+                          </Link>
+                        </div>
                         
-                        <Link
-                          to={`/image/${image.id}`}
-                          className="btn-primary flex-1 flex items-center justify-center space-x-2 text-sm"
+                        <button
+                          onClick={() => handleDeleteImage(image.id)}
+                          disabled={deletingItems.has(`image-${image.id}`)}
+                          className="btn-danger w-full flex items-center justify-center space-x-2 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                          title="Remove from session"
                         >
-                          <Eye className="w-4 h-4" />
-                          <span>View</span>
-                        </Link>
+                          {deletingItems.has(`image-${image.id}`) ? (
+                            <div className="spinner w-4 h-4"></div>
+                          ) : (
+                            <Trash2 className="w-4 h-4" />
+                          )}
+                          <span>{deletingItems.has(`image-${image.id}`) ? 'Removing...' : 'Remove'}</span>
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -397,7 +511,7 @@ const SessionViewer = () => {
           )}
 
           {/* Empty State */}
-          {session.snippets.length === 0 && session.images.length === 0 && !showCodeForm && !showImageForm && (
+          {safeSession.snippets.length === 0 && safeSession.images.length === 0 && !showCodeForm && !showImageForm && (
             <div className="text-center py-12">
               <div className="text-6xl mb-4">📝</div>
               <h2 className="text-2xl font-bold text-white mb-4">No Content Yet</h2>
@@ -606,7 +720,7 @@ const SessionViewer = () => {
         </div>
 
         {/* Add Content Buttons - Only show when there's content and no forms are open */}
-        {(session.snippets.length > 0 || session.images.length > 0) && !showCodeForm && !showImageForm && (
+        {(session && session.snippets && session.images && (session.snippets.length > 0 || session.images.length > 0)) && !showCodeForm && !showImageForm && (
           <div className="mt-12 flex flex-col sm:flex-row gap-4">
             <button
               onClick={() => setShowCodeForm(true)}

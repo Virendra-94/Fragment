@@ -1,19 +1,24 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useSearchParams } from 'react-router-dom';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { tomorrow } from 'react-syntax-highlighter/dist/esm/styles/prism';
-import { Copy, Check, Eye, Calendar, Clock, ArrowLeft, Share2 } from 'lucide-react';
+import { Copy, Check, Eye, Calendar, ArrowLeft, Share2 } from 'lucide-react';
 
 const CodeViewer = () => {
   const { id } = useParams();
+  const [searchParams] = useSearchParams();
   const [snippet, setSnippet] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [copied, setCopied] = useState(false);
 
+  // Get return URL from query params (for session context)
+  const returnUrl = searchParams.get('returnTo');
+  const returnLabel = searchParams.get('returnLabel') || 'Back to Session';
+
   useEffect(() => {
     fetchSnippet();
-  }, [id]);
+  }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const fetchSnippet = async () => {
     try {
@@ -85,11 +90,11 @@ const CodeViewer = () => {
             The code snippet you're looking for doesn't exist or has been removed.
           </p>
           <Link
-            to="/"
+            to={returnUrl || "/"}
             className="btn-primary inline-flex items-center space-x-2"
           >
             <ArrowLeft className="w-4 h-4" />
-            <span>Go Home</span>
+            <span>{returnUrl ? returnLabel : 'Go Home'}</span>
           </Link>
         </div>
       </div>
@@ -102,11 +107,11 @@ const CodeViewer = () => {
         {/* Header */}
         <div className="mb-8">
           <Link
-            to="/"
+            to={returnUrl || "/"}
             className="inline-flex items-center space-x-2 text-white/70 hover:text-white transition-colors mb-6"
           >
             <ArrowLeft className="w-4 h-4" />
-            <span>Back to Home</span>
+            <span>{returnUrl ? returnLabel : 'Back to Home'}</span>
           </Link>
           
           <div className="card-dark p-6">
