@@ -39,20 +39,34 @@ class FirebaseStorage {
 
   async getSession(sessionId) {
     try {
+      console.log(`Firebase: Attempting to get session ${sessionId}`);
       const sessionRef = ref(database, `sessions/${sessionId}`);
       const snapshot = await get(sessionRef);
+      
       if (snapshot.exists()) {
+        console.log(`Firebase: Session ${sessionId} exists`);
         const session = snapshot.val();
+        
         // Check if session has expired
         if (new Date(session.expiresAt) < new Date()) {
+          console.log(`Firebase: Session ${sessionId} has expired, deleting`);
           await this.deleteSession(sessionId);
           return null;
         }
+        
+        console.log(`Firebase: Session ${sessionId} retrieved successfully`);
         return session;
       }
+      
+      console.log(`Firebase: Session ${sessionId} does not exist`);
       return null;
     } catch (error) {
-      console.error('Error getting session:', error);
+      console.error(`Firebase: Error getting session ${sessionId}:`, error);
+      console.error('Firebase error details:', {
+        message: error.message,
+        code: error.code,
+        stack: error.stack
+      });
       return null;
     }
   }

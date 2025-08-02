@@ -300,13 +300,14 @@ app.get('/api/images/:id/download', async (req, res) => {
   try {
     const { id } = req.params;
     
-    // Try cache first
+    // First try to get from cache
     let imageInfo = imageFilesCache.get(id);
     
-    // If not in cache, get from Firebase
+    // If not in cache, try to get from Firebase
     if (!imageInfo) {
       imageInfo = await firebaseStorage.getImage(id);
       if (imageInfo) {
+        // Cache it for future requests
         imageFilesCache.set(id, imageInfo);
       }
     }
@@ -315,12 +316,25 @@ app.get('/api/images/:id/download', async (req, res) => {
       return res.status(404).json({ error: 'Image not found' });
     }
 
-    // Check if file exists
-    if (!fs.existsSync(imageInfo.path)) {
+    // Increment view count for downloads
+    imageInfo.views = (imageInfo.views || 0) + 1;
+    
+    // Update view count in Firebase and cache
+    await firebaseStorage.saveImage(id, imageInfo);
+    imageFilesCache.set(id, imageInfo);
+
+    // Check if file exists before trying to download
+    const filePath = path.resolve(imageInfo.path);
+    console.log(`Attempting to download image: ${id}`);
+    console.log(`File path: ${filePath}`);
+    console.log(`Original name: ${imageInfo.originalName}`);
+    
+    if (!fs.existsSync(filePath)) {
+      console.error(`File not found at path: ${filePath}`);
       return res.status(404).json({ error: 'Image file not found on disk' });
     }
 
-    res.download(imageInfo.path, imageInfo.originalName);
+    res.download(filePath, imageInfo.originalName);
   } catch (error) {
     console.error('Error downloading image:', error);
     res.status(500).json({ error: 'Failed to download image' });
@@ -328,17 +342,47 @@ app.get('/api/images/:id/download', async (req, res) => {
 });
 
 // View image
-app.get('/api/images/:id/view', (req, res) => {
+app.get('/api/images/:id/view', async (req, res) => {
   try {
     const { id } = req.params;
-    const imageInfo = imageFiles.get(id);
+    
+    // First try to get from cache
+    let imageInfo = imageFilesCache.get(id);
+    
+    // If not in cache, try to get from Firebase
+    if (!imageInfo) {
+      imageInfo = await firebaseStorage.getImage(id);
+      if (imageInfo) {
+        // Cache it for future requests
+        imageFilesCache.set(id, imageInfo);
+      }
+    }
     
     if (!imageInfo) {
       return res.status(404).json({ error: 'Image not found' });
     }
 
-    res.sendFile(imageInfo.path);
+    // Increment view count
+    imageInfo.views = (imageInfo.views || 0) + 1;
+    
+    // Update view count in Firebase and cache
+    await firebaseStorage.saveImage(id, imageInfo);
+    imageFilesCache.set(id, imageInfo);
+
+    // Check if file exists before trying to send
+    const filePath = path.resolve(imageInfo.path);
+    console.log(`Attempting to view image: ${id}`);
+    console.log(`File path: ${filePath}`);
+    
+    if (!fs.existsSync(filePath)) {
+      console.error(`File not found at path: ${filePath}`);
+      return res.status(404).json({ error: 'Image file not found on disk' });
+    }
+
+    // Send the image file
+    res.sendFile(filePath);
   } catch (error) {
+    console.error('Error viewing image:', error);
     res.status(500).json({ error: 'Failed to view image' });
   }
 });
@@ -400,15 +444,24 @@ app.post('/api/sessions', async (req, res) => {
 app.get('/api/sessions/:id', async (req, res) => {
   try {
     const { id } = req.params;
+    console.log(`Attempting to retrieve session: ${id}`);
+    
     const session = await firebaseStorage.getSession(id);
     
     if (!session) {
+      console.log(`Session not found: ${id}`);
       return res.status(404).json({ error: 'Session not found' });
     }
     
+    console.log(`Session retrieved successfully: ${id}`);
     res.json(session);
   } catch (error) {
     console.error('Error retrieving session:', error);
+    console.error('Error details:', {
+      message: error.message,
+      code: error.code,
+      stack: error.stack
+    });
     res.status(500).json({ error: 'Failed to retrieve session' });
   }
 });

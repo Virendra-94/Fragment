@@ -99,46 +99,6 @@ const SessionViewer = () => {
     }
   };
 
-  const handleAddImage = async (e) => {
-    e.preventDefault();
-    if (!selectedFile) {
-      alert('Please select an image');
-      return;
-    }
-
-    setIsSubmitting(true);
-    try {
-      const formData = new FormData();
-      formData.append('image', selectedFile);
-
-      const response = await fetch(`/api/sessions/${id}/images`, {
-        method: 'POST',
-        body: formData,
-      });
-
-      const data = await response.json();
-      
-      if (data.success) {
-        // Reset form and refresh session
-        setSelectedFile(null);
-        setShowImageForm(false);
-        fetchSession();
-      } else {
-        alert('Failed to add image to session');
-      }
-    } catch (error) {
-      console.error('Error:', error);
-      alert('Failed to add image to session');
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const handleFileSelect = (e) => {
-    const file = e.target.files[0];
-    setSelectedFile(file);
-  };
-
   const handleDeleteSnippet = async (snippetId) => {
     if (!window.confirm('Are you sure you want to remove this code snippet from the session?')) {
       return;
@@ -169,12 +129,87 @@ const SessionViewer = () => {
     }
   };
 
+  const handleFileSelect = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      // Check file size (limit to 10MB)
+      if (file.size > 10 * 1024 * 1024) {
+        alert('File size must be less than 10MB');
+        e.target.value = '';
+        return;
+      }
+      
+      // Check file type
+      if (!file.type.startsWith('image/')) {
+        alert('Please select a valid image file');
+        e.target.value = '';
+        return;
+      }
+      
+      setSelectedFile(file);
+    } else {
+      setSelectedFile(null);
+    }
+  };
+
+  const handleAddImage = async (e) => {
+    e.preventDefault();
+    
+    if (!selectedFile) {
+      alert('Please select an image file');
+      return;
+    }
+
+    setIsSubmitting(true);
+    
+    try {
+      const formData = new FormData();
+      formData.append('image', selectedFile);
+      
+      const response = await fetch(`/api/sessions/${id}/images`, {
+        method: 'POST',
+        body: formData,
+      });
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        // Reset form
+        setSelectedFile(null);
+        setShowImageForm(false);
+        
+        // Reset file input
+        const fileInput = document.querySelector('input[type="file"]');
+        if (fileInput) {
+          fileInput.value = '';
+        }
+        
+        // Refresh session data to show new image
+        await fetchSession();
+        
+        alert('Image added successfully!');
+      } else {
+        alert(data.error || 'Failed to add image to session');
+      }
+    } catch (error) {
+      console.error('Error adding image:', error);
+      alert('Failed to add image to session');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const handleDeleteImage = async (imageId) => {
     if (!window.confirm('Are you sure you want to remove this image from the session?')) {
       return;
     }
 
-    setDeletingItems(prev => new Set([...prev, `image-${imageId}`]));
+    setDeletingItems(prev => {
+      const newSet = new Set(prev);
+      newSet.add(`image-${imageId}`);
+      return newSet;
+    });
+
     try {
       const response = await fetch(`/api/sessions/${id}/images/${imageId}`, {
         method: 'DELETE',
@@ -346,6 +381,13 @@ const SessionViewer = () => {
                         <h3 className="text-xl font-semibold text-white mb-2">
                           {snippet.title}
                         </h3>
+                        <div className="text-white/60 text-sm mb-2">
+                          <span className="inline-flex items-center space-x-2">
+                            <span>{snippet.language || 'text'}</span>
+                            <span>•</span>
+                            <span>{snippet.views || 0} view{(snippet.views || 0) !== 1 ? 's' : ''}</span>
+                          </span>
+                        </div>
                         {snippet.description && (
                           <p className="text-white/70">
                             {snippet.description}
@@ -466,9 +508,10 @@ const SessionViewer = () => {
                       <h3 className="text-white font-medium mb-2 truncate">
                         {image.originalName}
                       </h3>
-                      <p className="text-white/60 text-sm mb-3">
-                        {(image.size / 1024 / 1024).toFixed(2)} MB
-                      </p>
+                      <div className="text-white/60 text-sm mb-3 space-y-1">
+                        <p>{(image.size / 1024 / 1024).toFixed(2)} MB</p>
+                        <p>{image.views || 0} view{(image.views || 0) !== 1 ? 's' : ''}</p>
+                      </div>
                       
                       <div className="flex flex-col space-y-2">
                         <div className="flex space-x-2">
